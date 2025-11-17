@@ -63,5 +63,5 @@ class TfIdf(object):
             x: (N, D) tfi-df numpy array
         Hint: .toarray() may be helpful
         '''
-        x = self.vectorizer.transform(data).toarray()
+        x = self.vectorizer.transform(data)
         return x
