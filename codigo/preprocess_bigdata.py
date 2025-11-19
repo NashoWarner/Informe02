@@ -1,5 +1,7 @@
 from datasets import load_dataset
 from transformers import AutoTokenizer
+from typing import List, Dict
+
 
 class Preprocess:
     def __init__(self):
@@ -13,13 +15,19 @@ class Preprocess:
         For the tokenizer:
         - Use 'distilbert-base-uncased' pretrained tokenizer
         '''
-        # Load Wikipedia dataset with streaming enabled
-        self.dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True, trust_remote_code=True)
-        
+         # Load Wikipedia dataset with streaming enabled
+        self.dataset = load_dataset(
+            'wikipedia', 
+            "20220301.en", 
+            split='train', 
+            streaming=True,
+            trust_remote_code=True  # FIX para el ValueError
+        )
+
         # Initialize DistilBert tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained('distilbert-base-uncased')
-    
-    def tokenize(self, examples, max_length=100):
+        self.tokenizer = AutoTokenizer.from_pretrained('distilbert-base-cased')
+
+    def tokenize(self, batch, max_length=100) -> Dict[str, List[List[str]]]:
         '''
         Tokenize the text from examples.
         
@@ -32,17 +40,16 @@ class Preprocess:
         '''
         # Tokenize the text with truncation
         tokenized = self.tokenizer(
-            examples['text'],
-            truncation=True,
+            batch['text'],
             max_length=max_length,
-            padding=False,
-            return_tensors=None
+            padding='max_length',  
+            truncation=True       
         )
-    
-        # Return only input_ids as 'tokens'
-        return {'tokens': tokenized['input_ids']}
-    
-    def preprocess_text(self, batch_size=1000):
+        tokens_list = [self.tokenizer.convert_ids_to_tokens(ids)for ids in tokenized['input_ids']]
+
+        return {"tokens": tokens_list}
+
+    def preprocess_text(self):
         '''
         Preprocess the dataset by tokenizing articles in batches.
         
@@ -52,12 +59,11 @@ class Preprocess:
         Return:
             Preprocessed dataset with id, title, and first 100 tokens
         '''
-        # Apply tokenization in batches
-        tokenized_dataset = self.dataset.map(
-            lambda examples: self.tokenize(examples, max_length=100),
+        dataset_with_tokens = self.dataset.map(
+            self.tokenize,
             batched=True,
-            batch_size=batch_size,
-            remove_columns=['text', 'url']  # Remove original text and url to save memory
+            batch_size=1000
         )
-        
-        return tokenized_dataset
+        dataset_cleaned = dataset_with_tokens.select_columns(['id', 'title', 'tokens'])
+
+        return dataset_cleaned
